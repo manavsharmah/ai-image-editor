@@ -21,7 +21,8 @@ echo "== 1. Claude builds =="
 claude -p "Read AGENTS.md (Builder role) and $TASK_FILE. Implement the task, run available checks, and commit. Do not push or deploy." "${CLAUDE_TOOLS[@]}"
 
 APPROVED=0
-for i in $(seq 1 "$MAX_ROUNDS"); do
+# One more review than fixes, so the last fix is reviewed too.
+for i in $(seq 1 "$((MAX_ROUNDS + 1))"); do
   echo "== 2. Codex review, round $i =="
   codex exec --sandbox read-only \
     "Read AGENTS.md (Reviewer role). Review git diff main...HEAD and follow the output rules exactly." \
@@ -33,6 +34,9 @@ for i in $(seq 1 "$MAX_ROUNDS"); do
     break
   fi
 
+  # That was the review of the last allowed fix.
+  [ "$i" -le "$MAX_ROUNDS" ] || break
+
   echo "== Claude fixes, round $i =="
   claude -p "Read AGENTS.md (Builder role) and .review.md. Fix high and medium problems only, then commit." "${CLAUDE_TOOLS[@]}"
 done
@@ -41,7 +45,7 @@ echo
 if [ "$APPROVED" -eq 1 ]; then
   echo "Codex approved (LGTM) on branch: $BRANCH"
 else
-  echo "NOT approved after $MAX_ROUNDS rounds. Read .review.md and decide yourself."
+  echo "NOT approved after $MAX_ROUNDS fix rounds. Read .review.md and decide yourself."
 fi
 
 echo "Next, by hand:"
