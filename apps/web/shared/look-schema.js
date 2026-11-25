@@ -7,18 +7,20 @@
 // Most sliders go from -100 to 100 and do nothing at 0.
 const RANGE = { min: -100, max: 100, default: 0, step: 1 };
 
+// `effect` is a stable id for what the slider does. The renderer uses it instead
+// of `name`, so a slider can be renamed without touching the shader.
 const GLOBAL_SLIDERS = [
   // unit "stops": the value has a physical meaning (+1 doubles the light).
-  { name: 'exposure', label: 'Exposure', min: -5, max: 5, default: 0, step: 0.05, unit: 'stops' },
-  { name: 'contrast', label: 'Contrast', ...RANGE },
-  { name: 'highlights', label: 'Highlights', ...RANGE },
-  { name: 'shadows', label: 'Shadows', ...RANGE },
-  { name: 'whites', label: 'Whites', ...RANGE },
-  { name: 'blacks', label: 'Blacks', ...RANGE },
-  { name: 'temperature', label: 'Temperature', ...RANGE }, // + is warmer
-  { name: 'tint', label: 'Tint', ...RANGE }, // + is magenta, - is green
-  { name: 'vibrance', label: 'Vibrance', ...RANGE },
-  { name: 'saturation', label: 'Saturation', ...RANGE },
+  { name: 'exposure', effect: 'lightStops', label: 'Exposure', min: -5, max: 5, default: 0, step: 0.05, unit: 'stops' },
+  { name: 'contrast', effect: 'toneSpread', label: 'Contrast', ...RANGE },
+  { name: 'highlights', effect: 'upperTones', label: 'Highlights', ...RANGE },
+  { name: 'shadows', effect: 'lowerTones', label: 'Shadows', ...RANGE },
+  { name: 'whites', effect: 'whiteEnd', label: 'Whites', ...RANGE },
+  { name: 'blacks', effect: 'blackEnd', label: 'Blacks', ...RANGE },
+  { name: 'temperature', effect: 'warmth', label: 'Temperature', ...RANGE }, // + is warmer
+  { name: 'tint', effect: 'magentaShift', label: 'Tint', ...RANGE }, // + is magenta, - is green
+  { name: 'vibrance', effect: 'mutedColor', label: 'Vibrance', ...RANGE },
+  { name: 'saturation', effect: 'allColor', label: 'Saturation', ...RANGE },
 ];
 
 // Color bands in hue order. `hue` is the band center in degrees.

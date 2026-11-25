@@ -7,7 +7,7 @@ const PREVIEW_MAX = 1600; // longest preview side, in pixels
 
 const GLOBALS = SLIDERS.filter((s) => !s.band);
 const BAND_SLIDERS = SLIDERS.filter((s) => s.band);
-const uniformName = (slider) => `u_${slider.name}`;
+const uniformName = (slider) => `fx_${slider.effect}`;
 const glslFloats = (numbers) => numbers.map((n) => n.toFixed(4)).join(', ');
 
 // Distance in degrees from each band to the next one around the color wheel.
@@ -23,8 +23,8 @@ void main() {
   gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
 }`;
 
-// Each global slider becomes the uniform u_<name>. If the schema renames one,
-// the shader fails to compile instead of silently ignoring it.
+// Each global slider becomes the uniform fx_<effect> (effect ids are in the
+// schema). If an effect goes missing, the shader fails to compile.
 const FRAGMENT = `#version 300 es
 precision highp float;
 uniform sampler2D u_image;
@@ -71,9 +71,9 @@ vec3 hslToRgb(vec3 hsl) {
 vec3 lightAndWhiteBalance(vec3 c) {
   c = toLinear(c);
   // Each stop doubles or halves the light.
-  c *= exp2(u_exposure);
+  c *= exp2(fx_lightStops);
   // Warm = more red, less blue. Magenta tint = less green.
-  vec3 gain = exp2(vec3(0.5 * u_temperature, -0.5 * u_tint, -0.5 * u_temperature));
+  vec3 gain = exp2(vec3(0.5 * fx_warmth, -0.5 * fx_magentaShift, -0.5 * fx_warmth));
   // Divide by the gain's brightness so white balance does not change exposure.
   return toSrgb(c * gain / luma(gain));
 }
@@ -86,13 +86,13 @@ vec3 tone(vec3 c) {
   float inv = 1.0 - y;
   // Shadows / highlights: bumps peaking (at 1.0) at y = 1/3 and y = 2/3 that
   // leave pure black and pure white alone.
-  c += 0.14 * u_shadows * 6.75 * y * inv * inv;
-  c += 0.14 * u_highlights * 6.75 * y * y * inv;
+  c += 0.14 * fx_lowerTones * 6.75 * y * inv * inv;
+  c += 0.14 * fx_upperTones * 6.75 * y * y * inv;
   // Blacks / whites: strongest at the ends, gone by mid gray.
-  c += 0.15 * u_blacks * (1.0 - smoothstep(0.0, 0.5, y));
-  c += 0.15 * u_whites * smoothstep(0.5, 1.0, y);
+  c += 0.15 * fx_blackEnd * (1.0 - smoothstep(0.0, 0.5, y));
+  c += 0.15 * fx_whiteEnd * smoothstep(0.5, 1.0, y);
   // Contrast: push away from (or pull toward) mid gray.
-  return (c - 0.5) * exp2(u_contrast) + 0.5;
+  return (c - 0.5) * exp2(fx_toneSpread) + 0.5;
 }
 
 vec3 colorBands(vec3 c) {
@@ -120,7 +120,7 @@ vec3 globalColor(vec3 c) {
   float hi = max(c.r, max(c.g, c.b));
   float lo = min(c.r, min(c.g, c.b));
   float muted = 1.0 - (hi - lo) / max(hi, 1e-5);
-  float amount = (1.0 + u_saturation) * (1.0 + u_vibrance * muted);
+  float amount = (1.0 + fx_allColor) * (1.0 + fx_mutedColor * muted);
   // 0 = gray of the same brightness, 1 = unchanged, above 1 = more color.
   return mix(vec3(luma(c)), c, amount);
 }
