@@ -1,0 +1,175 @@
+<!doctype html>
+<!-- Temporary page for checking the renderer by eye. Delete once the editor exists. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>Renderer test</title>
+    <style>
+      body { margin: 0; padding: 1rem; font: 14px system-ui, sans-serif; background: #222; color: #eee; }
+      main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 1rem; align-items: start; }
+      canvas { max-width: 100%; max-height: 90vh; position: sticky; top: 1rem; }
+      label { display: grid; grid-template-columns: 90px 1fr 44px; gap: .5rem; align-items: center; margin: .25rem 0; }
+      output { text-align: right; }
+      summary { cursor: pointer; margin: .5rem 0; }
+      @media (max-width: 700px) { main { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <p>
+      <input id="file" type="file" accept="image/*" aria-label="Choose a photo">
+      <button id="sample">Sample image</button>
+      <button id="reset">Reset</button>
+      <button id="export">Export full size</button>
+      <span id="status" role="status"></span>
+    </p>
+    <main>
+      <canvas id="view"></canvas>
+      <div id="sliders"></div>
+    </main>
+    <script type="module">
+      import { SLIDERS, BANDS, DEFAULTS } from './shared/look-schema.js';
+      import { createRenderer } from './js/renderer.js';
+
+      const $ = (id) => document.getElementById(id);
+      const status = (text) => { $('status').textContent = text; };
+      let look = { ...DEFAULTS };
+      let current = null; // the open image
+      let latestLoad = 0; // ignore slow loads that finish out of order
+      let renderer;
+      try {
+        renderer = createRenderer($('view'));
+        buildSliders();
+        showImage(makeSample());
+      } catch (error) {
+        status(error.message);
+        throw error;
+      }
+
+      // A 12MP sample: gray ramp, gray steps, hue sweep, muted color patches.
+      function makeSample() {
+        const c = document.createElement('canvas');
+        c.width = 4000;
+        c.height = 3000;
+        const ctx = c.getContext('2d');
+        const ramp = ctx.createLinearGradient(0, 0, c.width, 0);
+        ramp.addColorStop(0, '#000');
+        ramp.addColorStop(1, '#fff');
+        ctx.fillStyle = ramp;
+        ctx.fillRect(0, 0, 4000, 600);
+        for (let i = 0; i <= 10; i++) {
+          const v = Math.round(i * 25.5);
+          ctx.fillStyle = `rgb(${v} ${v} ${v})`;
+          ctx.fillRect(Math.floor(i * 4000 / 11), 600, Math.ceil(4000 / 11), 400);
+        }
+        // Hue sweep, light at the top and dark at the bottom.
+        for (let x = 0; x < 4000; x += 10) {
+          const g = ctx.createLinearGradient(0, 1000, 0, 2200);
+          const hue = x / 4000 * 360;
+          g.addColorStop(0, `hsl(${hue} 80% 85%)`);
+          g.addColorStop(0.5, `hsl(${hue} 80% 50%)`);
+          g.addColorStop(1, `hsl(${hue} 80% 12%)`);
+          ctx.fillStyle = g;
+          ctx.fillRect(x, 1000, 10, 1200);
+        }
+        // One patch per band, vivid above and muted below.
+        const w = 4000 / BANDS.length;
+        BANDS.forEach((band, i) => {
+          ctx.fillStyle = `hsl(${band.hue} 75% 50%)`;
+          ctx.fillRect(i * w, 2200, w, 400);
+          ctx.fillStyle = `hsl(${band.hue} 25% 50%)`;
+          ctx.fillRect(i * w, 2600, w, 400);
+        });
+        return c;
+      }
+
+      function showImage(image) {
+        renderer.setImage(image);
+        current?.close?.(); // free the previous photo
+        current = image;
+        status(`${image.width} x ${image.height}`);
+      }
+
+      function buildSliders() {
+        const groupFor = (title, open) => {
+          const group = document.createElement('details');
+          group.open = open;
+          const summary = document.createElement('summary');
+          summary.textContent = title;
+          group.append(summary);
+          $('sliders').append(group);
+          return group;
+        };
+        addSliders(groupFor('Global', true), SLIDERS.filter((s) => !s.band));
+        for (const band of BANDS) {
+          addSliders(groupFor(band.label, false), SLIDERS.filter((s) => s.band === band.name));
+        }
+      }
+
+      function addSliders(group, sliders) {
+        for (const s of sliders) {
+          const row = document.createElement('label');
+          const input = document.createElement('input');
+          const value = document.createElement('output');
+          Object.assign(input, { type: 'range', min: s.min, max: s.max, step: s.step, value: s.default });
+          input.dataset.name = s.name;
+          value.textContent = s.default;
+          input.addEventListener('input', () => {
+            look[s.name] = input.valueAsNumber;
+            value.textContent = input.value;
+            renderer.render(look);
+          });
+          row.append(s.label, input, value);
+          group.append(row);
+        }
+      }
+
+      $('reset').addEventListener('click', () => {
+        look = { ...DEFAULTS };
+        for (const input of document.querySelectorAll('input[type=range]')) {
+          input.value = look[input.dataset.name];
+          input.nextElementSibling.textContent = input.value;
+        }
+        renderer.render(look);
+      });
+
+      $('sample').addEventListener('click', () => {
+        latestLoad++;
+        $('file').value = '';
+        showImage(makeSample());
+      });
+
+      $('file').addEventListener('change', async () => {
+        const file = $('file').files[0];
+        if (!file) return;
+        const load = ++latestLoad;
+        try {
+          const bitmap = await createImageBitmap(file); // stays in this browser
+          if (load === latestLoad) showImage(bitmap);
+          else bitmap.close();
+        } catch {
+          if (load === latestLoad) status('Could not open that image.');
+        }
+      });
+
+      $('export').addEventListener('click', async () => {
+        status('Exporting...');
+        $('export').disabled = true;
+        try {
+          const blob = await renderer.exportBlob(look);
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = 'test-export.jpg';
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+          status(`Exported ${current.width} x ${current.height}`);
+        } catch (error) {
+          status(error.message);
+        } finally {
+          $('export').disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
