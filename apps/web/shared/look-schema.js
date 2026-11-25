@@ -11,17 +11,20 @@ const RANGE = { min: -100, max: 100, default: 0, step: 1 };
 // of `name`, so a slider can be renamed without touching the shader.
 const GLOBAL_SLIDERS = [
   // unit "stops": the value has a physical meaning (+1 doubles the light).
-  { name: 'exposure', effect: 'lightStops', label: 'Exposure', min: -5, max: 5, default: 0, step: 0.05, unit: 'stops' },
-  { name: 'contrast', effect: 'toneSpread', label: 'Contrast', ...RANGE },
-  { name: 'highlights', effect: 'upperTones', label: 'Highlights', ...RANGE },
-  { name: 'shadows', effect: 'lowerTones', label: 'Shadows', ...RANGE },
-  { name: 'whites', effect: 'whiteEnd', label: 'Whites', ...RANGE },
-  { name: 'blacks', effect: 'blackEnd', label: 'Blacks', ...RANGE },
-  { name: 'temperature', effect: 'warmth', label: 'Temperature', ...RANGE }, // + is warmer
-  { name: 'tint', effect: 'magentaShift', label: 'Tint', ...RANGE }, // + is magenta, - is green
-  { name: 'vibrance', effect: 'mutedColor', label: 'Vibrance', ...RANGE },
-  { name: 'saturation', effect: 'allColor', label: 'Saturation', ...RANGE },
+  { name: 'exposure', group: 'Light', effect: 'lightStops', label: 'Exposure', min: -5, max: 5, default: 0, step: 0.05, unit: 'stops' },
+  { name: 'contrast', group: 'Light', effect: 'toneSpread', label: 'Contrast', ...RANGE },
+  { name: 'highlights', group: 'Light', effect: 'upperTones', label: 'Highlights', ...RANGE },
+  { name: 'shadows', group: 'Light', effect: 'lowerTones', label: 'Shadows', ...RANGE },
+  { name: 'whites', group: 'Light', effect: 'whiteEnd', label: 'Whites', ...RANGE },
+  { name: 'blacks', group: 'Light', effect: 'blackEnd', label: 'Blacks', ...RANGE },
+  { name: 'temperature', group: 'Color', effect: 'warmth', label: 'Temperature', ...RANGE }, // + is warmer
+  { name: 'tint', group: 'Color', effect: 'magentaShift', label: 'Tint', ...RANGE }, // + is magenta, - is green
+  { name: 'vibrance', group: 'Color', effect: 'mutedColor', label: 'Vibrance', ...RANGE },
+  { name: 'saturation', group: 'Color', effect: 'allColor', label: 'Saturation', ...RANGE },
 ];
+
+// Panel sections, in display order. Every slider's `group` is one of these.
+export const GROUPS = Object.freeze(['Light', 'Color', 'HSL']);
 
 // Color bands in hue order. `hue` is the band center in degrees.
 export const BANDS = Object.freeze([
@@ -42,6 +45,7 @@ export const CHANNELS = Object.freeze(['Hue', 'Saturation', 'Luminance']);
 const BAND_SLIDERS = BANDS.flatMap((band) =>
   CHANNELS.map((channel) => ({
     name: band.name + channel,
+    group: 'HSL',
     label: channel,
     band: band.name,
     channel,
