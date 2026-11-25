@@ -1,0 +1,10 @@
+{
+  "name": "ai-image-editor",
+  "private": true,
+  "engines": { "node": ">=22.12.0" },
+  "workspaces": ["apps/api", "packages/shared"],
+  "scripts": {
+    "dev": "npm run dev --workspace @ai-image-editor/api",
+    "deploy": "npm run deploy --workspace @ai-image-editor/api"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // Becomes ai-image-editor.<your-subdomain>.workers.dev
+  "name": "ai-image-editor",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    // Relative to this config file. Everything in this folder is public.
+    "directory": "../web",
+    // /api/* always goes to Hono; other paths try a static file first.
+    "run_worker_first": ["/api/*"]
+  }
+}
