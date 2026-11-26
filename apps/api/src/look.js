@@ -11,13 +11,40 @@ export const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 export const MAX_PROMPT_LENGTH = 300;
 export const AI_TIMEOUT_MS = 8000;
 const MAX_TOKENS = 300;
-const MAX_BODY_LENGTH = 4096; // a 300-char prompt in JSON never needs more
-const MAX_RAW_BODY_LENGTH = MAX_BODY_LENGTH * 4; // bytes, before decoding
+// Long prompts are accepted and truncated, so the body limit is generous:
+// a 5,000-char prompt fully \uXXXX-escaped is ~30 KB. Anything larger is 413.
+const MAX_BODY_BYTES = 32 * 1024;
 
 const isObject = (value) =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 // --- Request ----------------------------------------------------------------
+
+// Reads the body as text but stops (and returns null) as soon as it passes
+// maxBytes, so a streamed body without Content-Length is never fully buffered.
+export async function readLimitedText(raw, maxBytes = MAX_BODY_BYTES) {
+  if (!raw.body) return '';
+  const reader = raw.body.getReader();
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
 
 // Returns { prompt } (trimmed, capped) or { status, error }.
 export async function readPrompt(req) {
@@ -26,12 +53,12 @@ export async function readPrompt(req) {
     return { status: 415, error: 'Send the prompt as JSON.' };
   }
   const length = Number(req.header('Content-Length'));
-  if (length > MAX_RAW_BODY_LENGTH) return { status: 413, error: 'That request is too large.' };
+  if (length > MAX_BODY_BYTES) return { status: 413, error: 'That request is too large.' };
 
   let body;
   try {
-    const text = await req.text();
-    if (text.length > MAX_BODY_LENGTH) return { status: 413, error: 'That request is too large.' };
+    const text = await readLimitedText(req.raw);
+    if (text === null) return { status: 413, error: 'That request is too large.' };
     body = JSON.parse(text);
   } catch {
     return { status: 400, error: 'That request was not valid JSON.' };
