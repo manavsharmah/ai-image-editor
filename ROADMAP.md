@@ -1,7 +1,7 @@
 # Roadmap (Phase 1)
 
 ## Phase list (the pipeline reads this; do not change the format)
-- [ ] m2b-tests — Test setup and M2 regression tests
+- [x] m2b-tests — Test setup and M2 regression tests
 - [ ] m3-ai-prompt — Text prompt sets sliders via Workers AI
 - [ ] m4a-stats — Image statistics (browser)
 - [ ] m4b-match — Reference matching: estimate sliders
