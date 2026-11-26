@@ -1,4 +1,5 @@
-// Playwright config. `npm test` starts the Worker with `npm run dev` and runs
+// Playwright config. `npm test` starts the Worker with `npm run dev:local`
+// (remote bindings off, so no Cloudflare login; AI calls fall back) and runs
 // every spec in tests/ against it in headless Chromium.
 import { defineConfig, devices } from '@playwright/test';
 
@@ -34,7 +35,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: 'npm run dev:local',
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

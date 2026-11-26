@@ -12,6 +12,8 @@
   },
   // Workers AI (free daily allocation only; no paid plan). Used by POST /api/look.
   // AI always runs on Cloudflare, even in `wrangler dev` (needs login there).
+  // `npm run dev:local` (used by tests) disables remote bindings: no login,
+  // and /api/look uses the keyword fallback.
   "ai": { "binding": "AI", "remote": true },
   // Per-IP limit for POST /api/look. Approximate, and counted separately in
   // each Cloudflare location. namespace_id must be unique in the account.
