@@ -108,17 +108,22 @@ export function buildInstructions() {
   ].join('\n');
 }
 
-// Pulls a JSON object out of the documented `response` field without
-// executing anything. Returns the parsed value or null.
+// A whole response wrapped in one ``` or ```json fence (a common model habit).
+const FENCED = /^```(?:json)?\s*([\s\S]*?)\s*```$/i;
+
+// Parses the documented `response` field as ONE complete JSON object.
+// Surrounding text, arrays and other top-level shapes are rejected (null)
+// so they fall back to keyword matching instead of being searched for JSON.
 export function extractModelJson(result) {
   const response = result?.response;
   if (isObject(response)) return response; // some models return parsed JSON
   if (typeof response !== 'string') return null;
-  const start = response.indexOf('{');
-  const end = response.lastIndexOf('}');
-  if (start < 0 || end < start) return null;
+  let text = response.trim();
+  const fenced = FENCED.exec(text);
+  if (fenced) text = fenced[1];
   try {
-    return JSON.parse(response.slice(start, end + 1));
+    const parsed = JSON.parse(text);
+    return isObject(parsed) ? parsed : null;
   } catch {
     return null;
   }
