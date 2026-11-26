@@ -79,6 +79,9 @@ export async function uploadImage(page, image, name = 'synthetic.png') {
 export async function expectPhotoOpen(page, name, image) {
   await expect(page.locator('#status')).toHaveText(`${name} (${image.width} x ${image.height})`);
   await expect(page.locator('#download')).toBeEnabled();
+  await expect(page.locator('#format')).toBeEnabled();
+  await expect(page.locator('#status')).not.toHaveClass(/error/);
+  await expect(page.locator('#view')).toBeVisible();
   // Sliders are disabled through their <fieldset>; check a real control.
   await expect(page.locator('#panel input[type="range"]').first()).toBeEnabled();
 }
@@ -105,10 +108,25 @@ export async function sliderInput(page, schema, slider) {
 // Moves a slider like a user would: the value is set on the range input and
 // real input/change events are dispatched, so editor.js reacts as usual.
 export async function setSlider(page, schema, slider, value) {
+  expect(value).toBeGreaterThanOrEqual(slider.min);
+  expect(value).toBeLessThanOrEqual(slider.max);
+  expect(value).toBe(snap(slider, value));
   const input = await sliderInput(page, schema, slider);
   await expect(input).toHaveCount(1);
   await input.fill(String(value));
   await expect(input).toHaveValue(String(value));
+  await expect(input.locator('..').locator('output')).toHaveText(String(value));
+}
+
+// Check every control, including collapsed HSL rows, against schema values.
+export async function expectLook(page, schema, overrides = {}) {
+  await expect(page.locator('#panel input[type="range"]')).toHaveCount(schema.SLIDERS.length);
+  for (const slider of schema.SLIDERS) {
+    const input = await sliderInput(page, schema, slider);
+    const value = overrides[slider.name] ?? slider.default;
+    await expect(input).toHaveValue(String(value));
+    await expect(input.locator('..').locator('output')).toHaveText(String(value));
+  }
 }
 
 // Downloads the current photo as PNG and decodes it back to pixels.
@@ -120,6 +138,8 @@ export async function downloadPng(page) {
   ]);
   expect(download.suggestedFilename()).toMatch(/\.png$/);
   const buffer = await readFile(await download.path());
+  // Check the actual encoding as well as the suggested extension.
+  expect(buffer.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   await expect(page.locator('#status')).toHaveText('Photo downloaded.');
   return decodePng(page, buffer);
 }

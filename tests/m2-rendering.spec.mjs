@@ -2,11 +2,11 @@
 // exposure brightens, and red saturation affects reds far more than blues.
 import {
   asymmetricImage, midtoneImage, patchesImage, RED_RECT, BLUE_RECT,
-  meanBrightness, meanAbsRgbChange, compareRgb,
+  meanBrightness, meanAbsRgbChange, meanChannelSpread, compareRgb,
 } from './helpers/images.mjs';
 import {
   test, expect, openEditor, getSchema, findByEffect, findBandSlider, snap,
-  uploadImage, setSlider, downloadPng,
+  uploadImage, setSlider, downloadPng, expectLook,
 } from './helpers/editor.mjs';
 
 // GPU rounding (sRGB <-> linear in floats, then back to 8 bits) may move a
@@ -20,6 +20,7 @@ test.beforeEach(async ({ page }) => {
 test('default look downloads the original pixels', async ({ page }) => {
   const source = asymmetricImage();
   await uploadImage(page, source);
+  await expectLook(page, await getSchema(page));
   const output = await downloadPng(page);
 
   expect([output.width, output.height]).toEqual([source.width, source.height]);
@@ -36,17 +37,37 @@ test('default look downloads the original pixels', async ({ page }) => {
   expect(close(at(output, 2, 2), at(source, 2, 44))).toBe(false); // top differs from bottom
 });
 
+test('opening another photo resets every changed slider to its schema default', async ({ page }) => {
+  const schema = await getSchema(page);
+  await uploadImage(page, asymmetricImage(), 'first.png');
+  for (const slider of schema.SLIDERS) {
+    const direction = slider.default < slider.max ? 1 : -1;
+    const value = snap(slider, slider.default + direction * slider.step);
+    expect(value).not.toBe(slider.default);
+    await setSlider(page, schema, slider, value);
+  }
+  await uploadImage(page, midtoneImage(), 'replacement.png');
+  await expectLook(page, schema);
+});
+
 test('exposure up raises mean brightness', async ({ page }) => {
   const schema = await getSchema(page);
   const exposure = findByEffect(schema, 'lightStops');
   // One fifth of the way from default to max (+1 stop with the current schema).
   const value = snap(exposure, exposure.default + (exposure.max - exposure.default) / 5);
   expect(value).toBeGreaterThan(exposure.default);
+  expect(value).toBeLessThanOrEqual(exposure.max);
 
-  await uploadImage(page, midtoneImage());
+  const source = midtoneImage();
+  await uploadImage(page, source);
   const before = await downloadPng(page);
   await setSlider(page, schema, exposure, value);
+  await expectLook(page, schema, { [exposure.name]: value });
   const after = await downloadPng(page);
+  for (const output of [before, after]) {
+    expect([output.width, output.height]).toEqual([source.width, source.height]);
+    expect(compareRgb(source, output).minAlpha).toBe(255);
+  }
 
   // +1 stop on a ~116 gray is about +40 levels; require at least 15 so the
   // test catches exposure that barely works or goes the wrong way.
@@ -63,7 +84,9 @@ test('lowering red saturation changes reds far more than blues', async ({ page }
   await uploadImage(page, patchesImage());
   const before = await downloadPng(page);
   await setSlider(page, schema, redSaturation, value);
+  await expectLook(page, schema, { [redSaturation.name]: value });
   const after = await downloadPng(page);
+  expect([after.width, after.height]).toEqual([before.width, before.height]);
 
   const red = meanAbsRgbChange(before, after, RED_RECT);
   const blue = meanAbsRgbChange(before, after, BLUE_RECT);
@@ -72,4 +95,6 @@ test('lowering red saturation changes reds far more than blues', async ({ page }
   expect(blue, 'blue patch change').toBeLessThanOrEqual(ROUNDING);
   // Floor of 1 level so a blue change of ~0 does not divide by zero.
   expect(red / Math.max(blue, 1), 'red / blue change').toBeGreaterThanOrEqual(5);
+  expect(meanChannelSpread(after, RED_RECT), 'red moves toward gray')
+    .toBeLessThan(meanChannelSpread(before, RED_RECT));
 });

@@ -117,6 +117,18 @@ export function meanAbsRgbChange(a, b, rect) {
   return sum / count;
 }
 
+// Mean channel spread measures distance from neutral gray, regardless of hue.
+export function meanChannelSpread(image, rect) {
+  let sum = 0;
+  let count = 0;
+  for (const i of indices(image, rect)) {
+    const rgb = image.pixels.subarray(i, i + 3);
+    sum += Math.max(...rgb) - Math.min(...rgb);
+    count++;
+  }
+  return sum / count;
+}
+
 // Largest RGB channel difference, its pixel position, and the smallest alpha
 // in `b`.
 export function compareRgb(a, b) {
