@@ -37,7 +37,13 @@ Manual sliders, text prompt -> AI sliders, reference image -> estimated
 sliders, mobile polish. Not in scope: preset catalogue, strong-match
 toggle, undo/redo, before/after, share links, custom domain.
 
-## Roles (two agents work on this repo)
+## Roles (agents work on this repo)
+
+### Planner (Codex)
+- Reads ROADMAP.md and the current code, then writes tasks/<phase>.md
+  for the next unchecked phase. Follows the roadmap scope and
+  done-when criteria exactly. Does not add features beyond the roadmap.
+- May edit ONLY files under tasks/.
 
 ### Builder (Claude Code)
 - Implements the task described in the given tasks/*.md file.
@@ -45,10 +51,11 @@ toggle, undo/redo, before/after, share links, custom domain.
   milestone branch.
 - Run available checks (npm install, wrangler deploy --dry-run) before
   finishing.
-- Never push, merge, deploy, or touch the main branch. The pipeline
-  script does that.
-- When given a review file, fix high and medium problems only, without
-  adding features.
+- Never push, merge, deploy, or touch the main branch. The human does
+  that.
+- When given a review file (.pipeline/review.md) or a bug report
+  (.pipeline/code-bug.md), fix only what it describes (high and medium
+  problems only), without adding features.
 
 ### Reviewer (Codex)
 - Read-only. Never edit files.
@@ -62,10 +69,30 @@ toggle, undo/redo, before/after, share links, custom domain.
   must be exactly: LGTM
 - Otherwise do NOT write LGTM anywhere in the reply.
 
+### Test-spec writer (Claude Code)
+- After a phase passes review, writes .pipeline/test-spec.md: concrete
+  behaviours, edge cases and failure cases to test, mapped to the
+  phase's done-when criteria. No code.
+
+### Test writer (Codex)
+- Writes automated tests under tests/ (Playwright for browser
+  behaviour, node:test for pure logic) covering every item in the
+  test spec.
+- May edit only tests/, package.json, package-lock.json and
+  playwright.config.*. Never edits app code under apps/.
+- On a test failure (given .pipeline/test-output.txt): decide whether
+  the test or the app is wrong. If the test, fix the test. If the app,
+  write the explanation to .pipeline/code-bug.md and change nothing
+  else.
+
 ## Workflow
-- One branch per milestone (m2-editor, m3-ai-prompt, ...). Small commits.
-- Flow: Builder implements -> Reviewer checks -> (Builder fixes,
-  max 2 rounds) -> pipeline pushes the branch -> optional merge and
-  deploy to production -> health check.
-- When unsure about Cloudflare or Hono APIs, check current official docs
-  rather than relying on memory.
+- One branch per phase (named after the phase id). Small commits.
+- Flow: Planner writes the plan -> human approves by running the phase
+  -> Builder implements -> Reviewer checks (Builder fixes, max 2 rounds)
+  -> Test-spec writer -> Test writer -> npm test (fix loop, max 2
+  rounds) -> Planner writes the next plan -> STOP and wait for the human.
+- Agents never push, merge or deploy. The human tests in the browser,
+  pushes, merges and deploys.
+- Agents never start the next phase on their own.
+- When unsure about Cloudflare or Hono APIs, check current official
+  docs rather than relying on memory.
