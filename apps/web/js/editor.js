@@ -1,6 +1,7 @@
-// Editor page: opening photos, the slider panel, and download.
-// Photos stay in this browser; nothing here makes a network request.
-import { SLIDERS, GROUPS, BANDS, DEFAULTS, clampLook } from '../shared/look-schema.js';
+// Editor page: opening photos, the slider panel, the look prompt, and download.
+// Photos stay in this browser. The only network request is the text prompt
+// sent to /api/look; no image data, metadata or canvas content is ever sent.
+import { SLIDERS, GROUPS, BANDS, DEFAULTS, clampLook, validateLook } from '../shared/look-schema.js';
 import { createRenderer } from './renderer.js';
 import { checkPhoto } from './photo-file.js';
 
@@ -40,7 +41,10 @@ function createRow(slider) {
   // min, max and step must be set before value, or the value gets limited.
   Object.assign(input, { type: 'range', min: slider.min, max: slider.max, step: slider.step });
   input.autocomplete = 'off'; // do not restore old positions on page reload
-  const change = (value) => setLook({ ...look, [slider.name]: value });
+  const change = (value) => {
+    cancelPrompt(); // a manual edit wins over a pending AI answer
+    setLook({ ...look, [slider.name]: value });
+  };
   input.addEventListener('input', () => change(input.valueAsNumber));
   input.addEventListener('dblclick', () => change(slider.default));
   row.append(slider.label, input, output);
@@ -99,6 +103,8 @@ async function openPhoto(file) {
 
   photo?.bitmap.close(); // free the previous photo now
   photo = { bitmap, name: file.name.replace(/\.[^.]*$/, '') || 'photo' };
+  cancelPrompt();
+  showPromptStatus('');
   setLook(DEFAULTS);
   $('view').hidden = false;
   $('drop').hidden = true;
@@ -134,6 +140,88 @@ function setUpOpening() {
   });
 }
 
+// --- Look prompt ------------------------------------------------------------
+
+let promptRequest = 0; // id of the newest prompt; older answers are ignored
+let promptAbort = null; // AbortController of the pending request, if any
+
+function showPromptStatus(text, isError = false) {
+  $('prompt-status').textContent = text; // always text, never HTML
+  $('prompt-status').classList.toggle('error', isError);
+}
+
+function setPromptBusy(busy) {
+  $('prompt-apply').disabled = busy;
+  $('prompt-form').classList.toggle('busy', busy);
+  $('prompt-form').setAttribute('aria-busy', String(busy));
+}
+
+// Drop any pending prompt (new photo, reset, manual edit, newer prompt).
+function cancelPrompt() {
+  if (!promptAbort) return;
+  promptRequest++;
+  promptAbort.abort();
+  promptAbort = null;
+  setPromptBusy(false);
+  showPromptStatus('');
+}
+
+// Turns a server reply into { look, text } or { error }.
+function readReply(status, data) {
+  const usable = (status === 200 || status === 429)
+    && data && (data.source === 'ai' || data.source === 'fallback')
+    && validateLook(data.look).valid;
+  if (!usable) {
+    const error = status >= 400 && status < 500 && typeof data?.error === 'string'
+      ? data.error
+      : 'Could not get a look right now. Please try again.';
+    return { error };
+  }
+  let text = 'Look applied. Fine-tune it with the sliders.';
+  if (status === 429) text = 'Too many requests, so a simple keyword match was used. Try AI again in a minute.';
+  else if (data.source === 'fallback') text = 'AI was unavailable, so a simple keyword match was used.';
+  return { look: data.look, text };
+}
+
+async function applyPrompt(event) {
+  event.preventDefault();
+  if (!photo || promptAbort) return; // no photo yet, or already waiting
+  const prompt = $('prompt').value.trim();
+  if (!prompt) {
+    showPromptStatus('Describe a look first, e.g. "warm and moody".', true);
+    return;
+  }
+  const id = ++promptRequest;
+  const controller = new AbortController();
+  promptAbort = controller;
+  setPromptBusy(true);
+  showPromptStatus('Creating your look...');
+
+  let reply;
+  try {
+    const response = await fetch('/api/look', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }), // text only
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => null);
+    reply = readReply(response.status, data);
+  } catch {
+    reply = { error: 'Could not reach the server. Check your connection and try again.' };
+  }
+  if (id !== promptRequest) return; // superseded or cancelled meanwhile
+
+  promptAbort = null;
+  setPromptBusy(false);
+  if (reply.error) {
+    showPromptStatus(reply.error, true); // the current look is kept
+    return;
+  }
+  setLook(reply.look);
+  showPromptStatus(reply.text);
+}
+
 // --- Download ---------------------------------------------------------------
 
 async function download() {
@@ -164,7 +252,11 @@ async function download() {
 
 buildPanel();
 setUpOpening();
-$('reset').addEventListener('click', () => setLook(DEFAULTS));
+$('reset').addEventListener('click', () => {
+  cancelPrompt();
+  setLook(DEFAULTS);
+});
+$('prompt-form').addEventListener('submit', applyPrompt);
 $('download').addEventListener('click', download);
 setLook(DEFAULTS);
 try {
