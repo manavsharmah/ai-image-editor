@@ -12,7 +12,9 @@
     "dev": "npm run dev --workspace @ai-image-editor/api",
     "dev:local": "npm run dev:local --workspace @ai-image-editor/api",
     "deploy": "npm run deploy --workspace @ai-image-editor/api",
-    "test": "playwright test",
+    "test:unit": "node --test \"tests/**/*.test.mjs\"",
+    "test:e2e": "playwright test",
+    "test": "npm run test:unit && npm run test:e2e",
     "test:install": "playwright install chromium"
   },
   "devDependencies": {
