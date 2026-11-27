@@ -45,6 +45,26 @@
           </div>
           <div id="sliders"></div>
         </fieldset>
+        <!-- Debug only: measured in this browser from small copies, never uploaded. -->
+        <details id="stats-debug" class="stats-debug">
+          <summary>Image statistics (debug)</summary>
+          <div class="stats-top">
+            <button id="choose-reference" type="button">Choose reference</button>
+            <input id="reference-file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+          </div>
+          <div class="stats-grid">
+            <section id="stats-source" aria-label="Source photo statistics">
+              <h3>Source</h3>
+              <p class="stats-msg" role="status" aria-live="polite"></p>
+              <div class="stats-body"></div>
+            </section>
+            <section id="stats-reference" aria-label="Reference photo statistics">
+              <h3>Reference</h3>
+              <p class="stats-msg" role="status" aria-live="polite"></p>
+              <div class="stats-body"></div>
+            </section>
+          </div>
+        </details>
       </aside>
     </main>
   </body>

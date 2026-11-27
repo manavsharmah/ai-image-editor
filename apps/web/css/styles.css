@@ -98,6 +98,22 @@ summary { padding: .35rem 0; cursor: pointer; }
 .row input { width: 100%; margin: 0; accent-color: var(--accent); touch-action: pan-y; }
 .row output { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* Debug statistics panel: two narrow columns, scrolls with the side panel. */
+.stats-debug { margin-top: 1.5rem; border-top: 1px solid var(--line); padding-top: .5rem; }
+.stats-debug .stats-top { margin: .4rem 0; }
+.stats-debug .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+.stats-debug h3 { margin: .2rem 0; font-size: .85rem; }
+.stats-debug .stats-msg { margin: 0; min-height: 1.2em; color: var(--muted); font-size: .75rem; overflow-wrap: anywhere; }
+.stats-debug .stats-msg.error { color: #ff9c9c; }
+.stats-debug .stats-empty, .stats-debug .stats-none { color: var(--muted); }
+.stats-debug .stats-thumb { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); }
+.stats-debug .stats-list { display: grid; gap: .1rem; margin: .4rem 0; font-size: .75rem; }
+.stats-debug .stats-list dt { color: var(--muted); }
+.stats-debug .stats-list dd { margin: 0 0 .2rem; font-variant-numeric: tabular-nums; }
+.stats-debug .stats-bands { width: 100%; border-collapse: collapse; font-size: .7rem; font-variant-numeric: tabular-nums; }
+.stats-debug .stats-bands th, .stats-debug .stats-bands td { padding: .1rem .15rem; text-align: right; font-weight: normal; }
+.stats-debug .stats-bands tr > th:first-child { text-align: left; }
+
 @media (max-width: 700px) {
   main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 45%) minmax(0, 1fr); }
   aside { border-left: 0; border-top: 1px solid var(--line); }

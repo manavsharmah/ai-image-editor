@@ -4,6 +4,7 @@
 import { SLIDERS, GROUPS, BANDS, DEFAULTS, clampLook, validateLook } from '../shared/look-schema.js';
 import { createRenderer } from './renderer.js';
 import { checkPhoto } from './photo-file.js';
+import { initStatsDebug, showSource } from './stats-debug.js';
 
 const $ = (id) => document.getElementById(id);
 const controls = []; // { slider, input, output } for every slider
@@ -103,6 +104,7 @@ async function openPhoto(file) {
 
   photo?.bitmap.close(); // free the previous photo now
   photo = { bitmap, name: file.name.replace(/\.[^.]*$/, '') || 'photo' };
+  showSource(bitmap); // synchronous, catches its own errors, never closes bitmap
   cancelPrompt();
   showPromptStatus('');
   setLook(DEFAULTS);
@@ -252,6 +254,7 @@ async function download() {
 
 buildPanel();
 setUpOpening();
+initStatsDebug();
 $('reset').addEventListener('click', () => {
   cancelPrompt();
   setLook(DEFAULTS);
