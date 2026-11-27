@@ -14,6 +14,8 @@ const STATIC_PATHS = new Set([
   '/js/editor.js',
   '/js/renderer.js',
   '/js/photo-file.js',
+  '/js/stats.js',
+  '/js/stats-debug.js',
   '/shared/look-schema.js',
   '/favicon.ico',
 ]);

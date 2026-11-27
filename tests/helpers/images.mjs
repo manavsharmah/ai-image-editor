@@ -17,6 +17,10 @@ function build(width, height, colorAt) {
   return { width, height, pixels };
 }
 
+export function solidImage(width, height, rgb) {
+  return build(width, height, () => rgb);
+}
+
 // Asymmetric: warm top band, varied middle, dark cool bottom, a white block
 // top-left and a black block bottom-right. Any flip or shift changes pixels.
 export function asymmetricImage() {
@@ -52,18 +56,19 @@ export const BLUE_RECT = { ...RED_RECT, x: PATCH_SIZE + INSET };
 // Encodes an image to PNG bytes in the browser with a 2D canvas.
 // Opaque pixels make putImageData lossless (no premultiplied-alpha rounding).
 export async function encodePng(page, image) {
+  // Transfer one base64 string instead of serializing millions of array entries.
   const base64 = await page.evaluate(async ({ width, height, data }) => {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     canvas.getContext('2d').putImageData(
-      new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
+      new ImageData(Uint8ClampedArray.from(atob(data), (c) => c.charCodeAt(0)), width, height), 0, 0);
     const blob = await new Promise((done) => canvas.toBlob(done, 'image/png'));
     const bytes = new Uint8Array(await blob.arrayBuffer());
     let binary = '';
     for (const byte of bytes) binary += String.fromCharCode(byte);
     return btoa(binary);
-  }, { width: image.width, height: image.height, data: Array.from(image.pixels) });
+  }, { width: image.width, height: image.height, data: Buffer.from(image.pixels).toString('base64') });
   return Buffer.from(base64, 'base64');
 }
 
