@@ -3,7 +3,7 @@
 ## Phase list (the pipeline reads this; do not change the format)
 - [x] m2b-tests — Test setup and M2 regression tests
 - [x] m3-ai-prompt — Text prompt sets sliders via Workers AI
-- [ ] m4a-stats — Image statistics (browser)
+- [x] m4a-stats — Image statistics (browser)
 - [ ] m4b-match — Reference matching: estimate sliders
 - [ ] m5-polish — Mobile layout, errors, launch polish
 
